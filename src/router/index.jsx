@@ -44,11 +44,8 @@ export default function AppRouter() {
               <DeviceTypesPage />
             </RoleBasedRoute>
           } />
-          <Route path="locations" element={
-            <RoleBasedRoute>
-              <LocationsTreePage />
-            </RoleBasedRoute>
-          } />
+          <Route path="locations" element={<LocationsTreePage />} />
+          <Route path="locations/manage" element={<LocationsPage />} />
           <Route path="inventory-events" element={<InventoryEventsPage />} />
           <Route path="maintenance-tasks" element={<MaintenanceTasksPage />} />
           <Route path="devices/:deviceId/failures" element={<FailureRecordsPage />} />

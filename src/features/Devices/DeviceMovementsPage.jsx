@@ -14,6 +14,7 @@ import AddDeviceMovementModal from './AddDeviceMovementModal'
 
 export default function DeviceMovementsPage() {
   const { deviceId } = useParams()
+  const numericDeviceId = deviceId ? Number(deviceId) : null
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -22,12 +23,14 @@ export default function DeviceMovementsPage() {
   const { 
     data: device, 
     isLoading: isLoadingDevice,
-    isError: isDeviceError
+    isError: isDeviceError,
+    refetch: refetchDevice
   } = useQuery({
     queryKey: ['device', deviceId],
-    queryFn: () => getDeviceById(parseInt(deviceId)),
-    enabled: !!deviceId,
-    onError: () => {
+    queryFn: () => getDeviceById(numericDeviceId),
+    enabled: !!numericDeviceId,
+    onError: (error) => {
+      console.error('Error fetching device:', error);
       toast.error('Устройство не найдено или у вас нет прав доступа')
       navigate('/devices')
     }
@@ -44,26 +47,39 @@ export default function DeviceMovementsPage() {
   // Fetch device movements
   const { 
     data: movements = [], 
-    isLoading: isLoadingMovements 
+    isLoading: isLoadingMovements,
+    refetch: refetchMovements 
   } = useQuery({
     queryKey: ['deviceMovements', deviceId],
-    queryFn: () => getDeviceMovements(parseInt(deviceId)),
-    enabled: !!deviceId && !isDeviceError
+    queryFn: () => getDeviceMovements(numericDeviceId),
+    enabled: !!numericDeviceId && !isDeviceError
   })
 
   const handleOpenAddModal = () => setIsAddModalOpen(true)
-  const handleCloseAddModal = () => setIsAddModalOpen(false)
+  
+  const handleCloseAddModal = () => {
+    setIsAddModalOpen(false)
+    // Refetch data when modal is closed to get the latest location and movements
+    refetchDevice()
+    refetchMovements()
+  }
 
   const formatDateTime = (dateTimeStr) => {
     try {
       return format(new Date(dateTimeStr), 'dd.MM.yyyy HH:mm')
-    } catch {
+    } catch (error) {
+      console.error('Error formatting date:', dateTimeStr, error);
       return 'Некорректная дата'
     }
   }
 
   if (isLoadingDevice) {
     return <Loader />
+  }
+
+  // Log useful information for debugging
+  if (device) {
+    console.log("Device current location:", device.current_location);
   }
 
   return (
@@ -149,12 +165,12 @@ export default function DeviceMovementsPage() {
         </div>
       )}
 
-      {isAddModalOpen && (
+      {isAddModalOpen && device && (
         <AddDeviceMovementModal
           isOpen={isAddModalOpen}
           onClose={handleCloseAddModal}
-          deviceId={parseInt(deviceId)}
-          currentLocationId={device?.current_location?.id}
+          deviceId={numericDeviceId}
+          currentLocationId={device.current_location?.id}
         />
       )}
     </AnimatedSection>

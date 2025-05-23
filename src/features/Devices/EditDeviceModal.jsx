@@ -4,7 +4,7 @@ import { FaTimes } from 'react-icons/fa'
 import { updateDevice } from '../../api/devices'
 import Modal from '../../components/common/Modal'
 
-export default function EditDeviceModal({ isOpen, onClose, device, onSuccess }) {
+export default function EditDeviceModal({ isOpen, onClose, device, onSuccess, deviceTypes }) {
   const [formData, setFormData] = useState({
     serial_number: '',
     device_type_id: '',
@@ -12,19 +12,22 @@ export default function EditDeviceModal({ isOpen, onClose, device, onSuccess }) 
     notes: ''
   })
   const [loading, setLoading] = useState(false)
-  const [deviceTypes, setDeviceTypes] = useState([])
-  const [locations, setLocations] = useState([])
 
   useEffect(() => {
     if (device) {
+      console.log('Setting form data from device:', device);
+      console.log('Current device type ID:', device.type?.id);
+      
       setFormData({
         serial_number: device.serial_number || '',
         device_type_id: device.type?.id ? String(device.type.id) : '',
         status: device.status || 'active',
         notes: device.notes || ''
-      })
+      });
+      
+      console.log('Device types available:', deviceTypes);
     }
-  }, [device])
+  }, [device, deviceTypes])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -38,8 +41,16 @@ export default function EditDeviceModal({ isOpen, onClose, device, onSuccess }) 
     e.preventDefault()
     setLoading(true)
     
+    // Parse the device_type_id to ensure it's a number
+    const submissionData = {
+      ...formData,
+      device_type_id: formData.device_type_id ? Number(formData.device_type_id) : null
+    };
+    
+    console.log('Submitting device update:', submissionData);
+    
     try {
-      await updateDevice(device.id, formData)
+      await updateDevice(device.id, submissionData)
       toast.success('Device updated successfully')
       onSuccess()
       onClose()
@@ -80,11 +91,19 @@ export default function EditDeviceModal({ isOpen, onClose, device, onSuccess }) 
             required
           >
             <option value="">Select Device Type</option>
-            {deviceTypes.map(type => (
-              <option key={type.id} value={type.id}>
-                {type.manufacturer} {type.model}
-              </option>
-            ))}
+            {deviceTypes && deviceTypes.map(type => {
+              const isSelected = type.id === Number(formData.device_type_id);
+              return (
+                <option 
+                  key={type.id} 
+                  value={type.id}
+                  className={isSelected ? "bg-blue-900" : ""}
+                >
+                  {type.manufacturer} {type.model}
+                  {isSelected ? ' (Current)' : ''}
+                </option>
+              );
+            })}
           </select>
         </div>
 

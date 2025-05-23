@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
-import { FaPlus, FaEdit, FaTrash, FaArrowUp, FaBuilding } from 'react-icons/fa'
+import { FaPlus, FaEdit, FaTrash, FaArrowUp, FaBuilding, FaSync, FaSitemap } from 'react-icons/fa'
 import { usePermissions } from '../../hooks/usePermissions'
 import { getAllLocations, deleteLocation } from '../../api/locations'
 import AddLocationModal from './AddLocationModal'
 import EditLocationModal from './EditLocationModal'
 import ConfirmModal from '../../components/common/ConfirmModal'
+import AnimatedSection from '../../components/AnimatedSection'
+import Button from '../../components/ui/Button'
+import Loader from '../../components/ui/Loader'
+import { Link } from 'react-router-dom'
 
 export default function LocationsPage() {
   const [locations, setLocations] = useState([])
@@ -84,98 +88,125 @@ export default function LocationsPage() {
     return parent ? parent.name : `ID: ${parentId}`
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="container mx-auto py-4 px-4">
-        <div className="bg-gray-800 text-white rounded-lg shadow p-4 text-center">
-          <h3 className="text-xl font-medium">Admin privileges required</h3>
-          <p className="mt-2">You don't have permission to view this page.</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="container mx-auto py-4 px-4 animate__animated animate__fadeIn">
+    <AnimatedSection className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-white flex items-center">
           <FaBuilding className="mr-2" /> Locations Management
         </h2>
-        <button 
-          onClick={handleOpenAddModal}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-md transition duration-200 transform hover:scale-105"
-        >
-          <FaPlus /> Add New Location
-        </button>
+        
+        <div className="flex space-x-2">
+          <Button 
+            onClick={fetchLocations}
+            variant="secondary"
+            className="flex items-center gap-1"
+          >
+            <FaSync /> Refresh
+          </Button>
+          
+          <Link to="/locations">
+            <Button 
+              variant="secondary"
+              className="flex items-center gap-1"
+            >
+              <FaSitemap /> Tree View
+            </Button>
+          </Link>
+          
+          {isAdmin && (
+            <Button 
+              onClick={handleOpenAddModal}
+              className="flex items-center gap-1 bg-gradient-to-r from-blue-600 to-indigo-600"
+            >
+              <FaPlus /> Add New Location
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
+      <div className="glassmorphism rounded-lg border border-gray-700 relative overflow-hidden">
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 grid grid-cols-10 grid-rows-10 opacity-5 pointer-events-none">
+          {Array.from({ length: 100 }).map((_, i) => (
+            <div key={i} className="border border-white/20"></div>
+          ))}
+        </div>
+        
         {loading ? (
           <div className="flex justify-center items-center py-10">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+            <Loader />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-700">
-              <thead className="bg-gray-900">
+          <div className="overflow-x-auto relative z-10">
+            <table className="w-full text-left">
+              <thead className="backdrop-blur-sm bg-gray-800/50 sticky top-0 border-b border-gray-700">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">ID</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Parent Location</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Description</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Devices</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Child Locations</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                  <th className="p-4 text-xs font-medium uppercase text-gray-300">ID</th>
+                  <th className="p-4 text-xs font-medium uppercase text-gray-300">Name</th>
+                  <th className="p-4 text-xs font-medium uppercase text-gray-300">Parent Location</th>
+                  <th className="p-4 text-xs font-medium uppercase text-gray-300">Description</th>
+                  <th className="p-4 text-xs font-medium uppercase text-gray-300">Devices</th>
+                  <th className="p-4 text-xs font-medium uppercase text-gray-300">Child Locations</th>
+                  {isAdmin && (
+                    <th className="p-4 text-xs font-medium uppercase text-gray-300">Actions</th>
+                  )}
                 </tr>
               </thead>
-              <tbody className="bg-gray-800 divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-700/30">
                 {locations.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-6 py-4 text-center text-gray-400">No locations found</td>
+                    <td colSpan={isAdmin ? "7" : "6"} className="p-4 text-center text-gray-400">No locations found</td>
                   </tr>
                 ) : (
                   locations.map((location) => (
-                    <tr key={location.id} className="hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{location.id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{location.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                    <tr key={location.id} className="hover:bg-gray-700/50 transition-colors">
+                      <td className="p-4 text-sm text-gray-300">{location.id}</td>
+                      <td className="p-4 text-sm text-white font-medium">{location.name}</td>
+                      <td className="p-4 text-sm text-gray-300">
                         {location.parent_id ? (
                           <div className="flex items-center">
-                            <FaArrowUp className="mr-1 text-gray-500" />
+                            <FaArrowUp className="mr-1 text-blue-400" />
                             {getParentName(location.parent_id)}
                           </div>
                         ) : (
-                          'Root'
+                          <span className="text-green-400">Root</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-300">
+                      <td className="p-4 text-sm text-gray-300">
                         {location.description || '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {location.devices?.length > 0 ? location.devices.length : '0'}
+                      <td className="p-4 text-sm text-gray-300">
+                        <span className="px-2 py-1 bg-blue-900/50 text-blue-300 rounded-full text-xs">
+                          {location.devices?.length > 0 ? location.devices.length : '0'} devices
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {location.children?.length > 0 ? location.children.length : '0'}
+                      <td className="p-4 text-sm text-gray-300">
+                        <span className="px-2 py-1 bg-indigo-900/50 text-indigo-300 rounded-full text-xs">
+                          {location.children?.length > 0 ? location.children.length : '0'} locations
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => handleOpenEditModal(location)}
-                            className="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-gray-600"
-                            title="Edit"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button 
-                            onClick={() => handleOpenDeleteModal(location)}
-                            className={`text-red-400 hover:text-red-300 p-1 rounded hover:bg-gray-600 ${!canDelete(location) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title="Delete"
-                            disabled={!canDelete(location)}
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                      </td>
+                      {isAdmin && (
+                        <td className="p-4 text-sm text-gray-300">
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="icon" 
+                              onClick={() => handleOpenEditModal(location)}
+                              title="Edit"
+                            >
+                              <FaEdit className="text-blue-400" />
+                            </Button>
+                            <Button 
+                              variant="icon" 
+                              onClick={() => handleOpenDeleteModal(location)}
+                              title="Delete"
+                              disabled={!canDelete(location)}
+                              className={!canDelete(location) ? 'opacity-50 cursor-not-allowed' : ''}
+                            >
+                              <FaTrash className="text-red-400" />
+                            </Button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -185,7 +216,7 @@ export default function LocationsPage() {
         )}
       </div>
 
-      {isAddModalOpen && (
+      {isAdmin && isAddModalOpen && (
         <AddLocationModal 
           isOpen={isAddModalOpen}
           onClose={handleCloseAddModal}
@@ -194,7 +225,7 @@ export default function LocationsPage() {
         />
       )}
 
-      {isEditModalOpen && selectedLocation && (
+      {isAdmin && isEditModalOpen && selectedLocation && (
         <EditLocationModal
           isOpen={isEditModalOpen}
           onClose={handleCloseEditModal}
@@ -204,7 +235,7 @@ export default function LocationsPage() {
         />
       )}
 
-      {isDeleteModalOpen && selectedLocation && (
+      {isAdmin && isDeleteModalOpen && selectedLocation && (
         <ConfirmModal
           isOpen={isDeleteModalOpen}
           onClose={handleCloseDeleteModal}
@@ -214,6 +245,6 @@ export default function LocationsPage() {
           variant="danger"
         />
       )}
-    </div>
+    </AnimatedSection>
   )
-}
+} 

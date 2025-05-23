@@ -1,12 +1,11 @@
-import { useState,  useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { FiBox, FiCpu, FiMap, FiSettings, FiClipboard, FiActivity, 
-  FiChevronRight, FiLogOut, FiUser, FiLayers, FiHome, 
+  FiChevronRight, FiUser, FiLayers, FiHome, 
   FiTool, FiAlertTriangle, FiRefreshCw } from 'react-icons/fi'
-import { FaBuilding, FaCog } from 'react-icons/fa'
 import { motion as Motion, AnimatePresence } from 'framer-motion'
-import { useAuth } from '../../hooks/useAuth'
 import { usePermissions } from '../../hooks/usePermissions'
+import { useDataCenterActivity } from '../../hooks/useDataCenterActivity'
 
 // Group navigation items by category
 const navSections = [
@@ -46,26 +45,15 @@ const navSections = [
       { to: '/analytics', icon: <FiActivity />, label: 'Отчеты', badge: 'Админ' },
     ],
     requiredRole: 'admin' // Admin only section
-  },
-  {
-    title: 'Locations',
-    path: '/locations',
-    icon: <FaBuilding />,
-  },
-  {
-    title: 'Manage Locations',
-    path: '/locations/manage',
-    icon: <FaCog />,
-    roles: ['admin']
   }
 ]
 
 export default function Sidebar() {
   const [openSections, setOpenSections] = useState({})
   const [hoveredItem, setHoveredItem] = useState(null)
-  const { logout, user } = useAuth()
   const location = useLocation()
-  const { isAdmin: _isAdmin } = usePermissions()
+  const { isAdmin } = usePermissions()
+  const { values, timestamps, serverStatus, loading } = useDataCenterActivity();
   
   // Auto expand sections on load based on active route
   useEffect(() => {
@@ -74,8 +62,6 @@ export default function Sidebar() {
       if (section.items && Array.isArray(section.items) && 
           section.items.some(item => item.to === location.pathname)) {
         newOpenSections[section.title] = true
-      } else if (section.path && section.path === location.pathname) {
-        newOpenSections[section.title] = true
       }
     })
     setOpenSections(newOpenSections)
@@ -83,17 +69,11 @@ export default function Sidebar() {
   
   // Check if a section contains the active route
   const isSectionActive = (section) => {
-    // Handle sections with a direct path
-    if (section.path) {
-      return location.pathname === section.path;
+    if (!section.items || !Array.isArray(section.items)) {
+      return false;
     }
     
-    // Handle sections with items array
-    if (section.items && Array.isArray(section.items)) {
-      return section.items.some(item => location.pathname === item.to);
-    }
-    
-    return false;
+    return section.items.some(item => location.pathname === item.to);
   }
 
   // Toggle section open/closed
@@ -106,75 +86,93 @@ export default function Sidebar() {
 
   // Filter sections based on user role
   const filteredSections = navSections.filter(section => {
-    return section.requiredRole === null || section.requiredRole === user?.role;
+    return section.requiredRole === null || (section.requiredRole === 'admin' && isAdmin);
   });
+  
+  // Animation variants for panels
+  const panelVariants = {
+    open: { height: 'auto', opacity: 1 },
+    closed: { height: 0, opacity: 0 }
+  };
 
   return (
-    <div className="flex flex-col h-full justify-between py-6 overflow-hidden">
-      <div>
-        {/* Logo & Brand */}
-        <Motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="px-6 mb-8"
-        >
-          <Motion.div
-            whileHover={{ scale: 1.03 }}
-            transition={{ type: "spring", stiffness: 400, damping: 10 }}
-          >
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-indigo-500 bg-clip-text text-transparent flex items-center">
-              <span className="mr-2">
-                <span className="relative inline-flex">
-                  <span className="w-3 h-3 bg-violet-500 rounded-full"></span>
-                  <Motion.span 
-                    animate={{ scale: [1, 1.3, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="w-3 h-3 bg-violet-400 rounded-full absolute inset-0 opacity-75"
-                  ></Motion.span>
-                </span>
-              </span>
-              ИТ-Учёт
-            </h2>
-            <p className="text-xs text-gray-400 ml-5 mt-0.5">Система управления оборудованием</p>
-          </Motion.div>
-        </Motion.div>
-        
-        {/* User Quick Info - Mobile Only */}
-        <div className="px-5 mb-6 md:hidden">
-          <div className="flex items-center gap-3 bg-gradient-to-r from-[#2d2d45]/40 to-[#33294e]/40 rounded-lg p-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-medium shadow-lg">
-              {user?.username?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
-            <div>
-              <p className="font-medium text-sm">{user?.username || 'Пользователь'}</p>
-              <p className="text-xs text-gray-400">{user?.role || 'Гость'}</p>
-            </div>
-          </div>
+    <div className="flex flex-col h-full relative">
+      {/* Background Grid Pattern - Matching AppLayout */}
+      <div className="absolute inset-0 z-0 opacity-30 overflow-hidden">
+        <div className="grid grid-cols-4 grid-rows-12 h-full w-full">
+          {Array.from({ length: 48 }).map((_, i) => (
+            <Motion.div 
+              key={i}
+              initial={{ opacity: 0.1 }}
+              animate={{ opacity: [0.1, 0.15, 0.1] }}
+              transition={{ duration: 3 + (i % 3), repeat: Infinity, repeatType: 'reverse' }}
+              className="border-[0.5px] border-violet-900/20"
+            />
+          ))}
         </div>
-        
-        {/* Navigation Sections */}
-        <div className="px-4 space-y-1.5 overflow-y-auto no-scrollbar" style={{ maxHeight: 'calc(100vh - 240px)' }}>
+      </div>
+
+      {/* Sidebar Content */}
+      <div className="flex-1 overflow-y-auto no-scrollbar relative z-10 pt-2">
+        <div className="px-3 mb-6">
+          {/* System Status Dashboard Card */}
+          <Motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="w-full rounded-xl overflow-hidden bg-gradient-to-br from-violet-900/30 to-indigo-800/20 backdrop-blur-sm border border-violet-700/30 shadow-lg"
+          >
+            <div className="p-3 text-center">
+              <h3 className="text-[0.8rem] font-medium text-violet-300">Статус системы</h3>
+              
+              <div className="grid grid-cols-3 gap-1 my-2">
+                <div className="px-2 py-1.5 rounded-lg bg-[#2d2d36]/40">
+                  <div className="text-xs text-violet-400">Устройств</div>
+                  <div className="text-lg font-semibold">127</div>
+                </div>
+                <div className="px-2 py-1.5 rounded-lg bg-[#2d2d36]/40">
+                  <div className="text-xs text-violet-400">Неполадки</div>
+                  <div className="text-lg font-semibold">3</div>
+                </div>
+                <div className="px-2 py-1.5 rounded-lg bg-[#2d2d36]/40">
+                  <div className="text-xs text-violet-400">Списано</div>
+                  <div className="text-lg font-semibold">12</div>
+                </div>
+              </div>
+              
+              <div className="mt-2 px-2 flex justify-between items-center">
+                <div className="flex items-center">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+                  <span className="text-xs text-gray-400">Серверы работают</span>
+                </div>
+                <div className="text-xs text-violet-400">99.8% аптайм</div>
+              </div>
+            </div>
+          </Motion.div>
+        </div>
+
+        {/* Navigation Menu */}
+        <div className="space-y-1 px-3">
           {filteredSections.map((section) => {
-            // Auto-open section if it contains active route
             const isActive = isSectionActive(section)
             const isSectionOpen = openSections[section.title] ?? isActive
             
             return (
               <Motion.div 
                 key={section.title} 
-                className="mb-1.5"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="mb-1"
               >
                 {/* Section Header */}
                 <button
                   onClick={() => toggleSection(section.title)}
                   className={`
-                    w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all
+                    w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all
                     ${isActive 
-                      ? 'text-white bg-gradient-to-r from-violet-600/20 to-indigo-600/20 shadow-sm' 
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-[#2d2d36]/40'}
+                      ? 'bg-gradient-to-r from-violet-600/20 to-indigo-600/20 text-white backdrop-blur-sm border border-violet-500/20' 
+                      : 'text-gray-400 hover:bg-[#2d2d36]/50 hover:text-white'}
                   `}
                 >
                   <div className="flex items-center gap-3">
@@ -183,9 +181,9 @@ export default function Sidebar() {
                     </span>
                     <span className="font-medium text-sm">{section.title}</span>
                     
-                    {/* Add admin badge for admin-only sections */}
-                    {(section.title === 'Типы деталей' || section.title === 'Локации') && (
-                      <span className="text-xs px-1.5 py-0.5 bg-amber-700/30 text-amber-400 rounded-full">
+                    {/* Admin badge */}
+                    {section.requiredRole === 'admin' && (
+                      <span className="text-xs px-1.5 py-0.5 bg-violet-900/50 text-violet-300 rounded-full text-[0.65rem] font-medium">
                         Админ
                       </span>
                     )}
@@ -193,7 +191,7 @@ export default function Sidebar() {
                   <Motion.span
                     animate={{ rotate: isSectionOpen ? 90 : 0 }}
                     transition={{ duration: 0.2 }}
-                    className="text-gray-500"
+                    className={`text-sm ${isActive ? 'text-violet-400' : 'text-gray-500'}`}
                   >
                     <FiChevronRight />
                   </Motion.span>
@@ -201,48 +199,53 @@ export default function Sidebar() {
                 
                 {/* Section Items */}
                 <AnimatePresence>
-                  {isSectionOpen && (
+                  {isSectionOpen && section.items && Array.isArray(section.items) && (
                     <Motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3 }}
+                      variants={panelVariants}
+                      initial="closed"
+                      animate="open"
+                      exit="closed"
+                      transition={{ duration: 0.2 }}
                       className="overflow-hidden"
                     >
-                      <div className="pl-10 pt-1 pb-1 space-y-1">
+                      <div className="pt-1 pb-1 space-y-0.5 pl-10">
                         {section.items.map((item) => (
-          <NavLink
+                          <NavLink
                             key={item.to}
                             to={item.to}
-            className={({ isActive }) =>
-                              isActive ? 'your-active-classes' : 'your-inactive-classes'
-                            }
+                            className={({ isActive }) => `
+                              relative flex items-center gap-3 px-4 py-2 rounded-md
+                              transition-all duration-150 group
+                              ${isActive 
+                                ? 'bg-violet-500/10 text-white border border-violet-500/10' 
+                                : 'text-gray-400 hover:bg-[#2d2d36]/50 hover:text-gray-200'}
+                            `}
                             onMouseEnter={() => setHoveredItem(item.to)}
                             onMouseLeave={() => setHoveredItem(null)}
                           >
                             <span className={({ isActive }) => 
-                              isActive ? 'text-violet-400' : 'text-gray-500 group-hover:text-gray-300'
+                              `transition-colors ${isActive ? 'text-violet-400' : 'text-gray-500 group-hover:text-violet-400'}`
                             }>
                               {item.icon}
                             </span>
                             <span className="text-sm">{item.label}</span>
                             
                             {/* Badge */}
-                            {item.badge && (
-                              <span className="absolute right-3 bg-violet-500/80 text-white text-xs px-1.5 py-0.5 rounded-full">
+                            {item.badge && isAdmin && (
+                              <span className="absolute right-3 bg-violet-700/80 text-violet-300 text-xs px-1.5 py-0.5 rounded-full text-[0.65rem]">
                                 {item.badge}
                               </span>
                             )}
                             
-                            {/* Hover effect */}
+                            {/* Hover indicator */}
                             {hoveredItem === item.to && (
                               <Motion.span
                                 layoutId="hoverIndicator"
-                                className="absolute left-0 top-0 bottom-0 w-0.5 bg-violet-500 rounded-full"
+                                className="absolute left-0 top-1/2 -translate-y-1/2 h-3/5 w-1 bg-violet-500 rounded-full"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
+                                transition={{ duration: 0.15 }}
                               />
                             )}
           </NavLink>
@@ -257,64 +260,76 @@ export default function Sidebar() {
         </div>
       </div>
       
-      {/* Footer Section */}
-      <div className="px-4 mt-auto pt-4 border-t border-gray-800/50">
-        <NavLink
-          to="/profile"
-          className={({ isActive }) => `
-            relative flex items-center gap-3 px-3 py-2 rounded-md transition-all group mb-1
-            ${isActive 
-              ? 'bg-gradient-to-r from-violet-600/20 to-indigo-600/20 text-white' 
-              : 'text-gray-400 hover:text-gray-200 hover:bg-[#2d2d36]/40'}
-          `}
-          onMouseEnter={() => setHoveredItem('/profile')}
-          onMouseLeave={() => setHoveredItem(null)}
-        >
-          <span className={({ isActive }) => 
-            isActive ? 'text-violet-400' : 'text-gray-500 group-hover:text-gray-300'
-          }>
-            <FiUser />
-          </span>
-          <span className="text-sm">Профиль</span>
-          
-          {hoveredItem === '/profile' && (
-            <Motion.span
-              layoutId="hoverIndicator"
-              className="absolute left-0 top-0 bottom-0 w-0.5 bg-violet-500 rounded-full"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            />
-          )}
-        </NavLink>
-        
-        <button
-          onClick={logout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-gray-400 hover:text-gray-200 hover:bg-[#2d2d36]/40 transition-all relative group"
-          onMouseEnter={() => setHoveredItem('logout')}
-          onMouseLeave={() => setHoveredItem(null)}
-        >
-          <span className="text-gray-500 group-hover:text-red-400">
-            <FiLogOut />
-          </span>
-          <span className="text-sm group-hover:text-red-400">Выйти</span>
-          
-          {hoveredItem === 'logout' && (
-            <Motion.span
-              layoutId="hoverIndicator"
-              className="absolute left-0 top-0 bottom-0 w-0.5 bg-red-500 rounded-full"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            />
-          )}
-        </button>
-        
-        {/* Version Info */}
-        <div className="mt-4 px-3 text-xs text-gray-600">
-          Версия 1.0.0
+      {/* Bottom Utility Card */}
+      <div className="mt-auto pt-4 pb-6 px-4">
+        <div className="rounded-xl overflow-hidden backdrop-blur-sm border border-violet-800/20 shadow-lg">
+          <div className="p-3 bg-gradient-to-br from-[#2d2d36]/50 to-[#252530]/50">
+            <div className="mb-1 flex justify-between items-center">
+              <h3 className="text-xs font-medium text-violet-300">Активность ЦОД</h3>
+              <span className={`
+                inline-block rounded-full px-2 py-0.5 text-[0.65rem] font-medium 
+                ${serverStatus === 'online' ? 'bg-emerald-700/40 text-emerald-300' : 
+                  serverStatus === 'warning' ? 'bg-amber-700/40 text-amber-300' : 
+                  'bg-red-700/40 text-red-300'}
+              `}>
+                {serverStatus === 'online' ? 'Стабильно' : 
+                 serverStatus === 'warning' ? 'Нагрузка' : 'Критично'}
+              </span>
+            </div>
+            
+            {/* Server Load Visualization */}
+            <div className="h-16 flex items-end gap-0.5 mt-1">
+              {loading ? (
+                // Loading placeholder
+                <div className="w-full h-full flex items-center justify-center">
+                  <Motion.div 
+                    animate={{ opacity: [0.3, 0.8, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    className="text-xs text-violet-400"
+                  >
+                    Загрузка...
+                  </Motion.div>
+                </div>
+              ) : (
+                // Real data visualization
+                values.map((value, i) => (
+                  <Motion.div
+                    key={i}
+                    initial={{ height: 0 }}
+                    animate={{ height: `${value}%` }}
+                    transition={{ 
+                      duration: 0.5,
+                      delay: i * 0.02
+                    }}
+                    className={`
+                      flex-1 rounded-sm
+                      ${value > 80 ? 'bg-gradient-to-t from-red-500/80 to-red-400/30' :
+                       value > 60 ? 'bg-gradient-to-t from-amber-500/80 to-amber-400/30' :
+                       'bg-gradient-to-t from-violet-500/80 to-violet-400/30'}
+                    `}
+                  />
+                ))
+              )}
+            </div>
+            
+            <div className="mt-2 flex justify-between text-[0.65rem] text-gray-400">
+              {timestamps.length > 0 ? (
+                <>
+                  <span>{new Date(timestamps[0]).getHours()}:00</span>
+                  <span>{new Date(timestamps[Math.floor(timestamps.length / 3)]).getHours()}:00</span>
+                  <span>{new Date(timestamps[Math.floor(timestamps.length * 2 / 3)]).getHours()}:00</span>
+                  <span>{new Date(timestamps[timestamps.length - 1]).getHours()}:00</span>
+                </>
+              ) : (
+                <>
+                  <span>08:00</span>
+                  <span>12:00</span>
+                  <span>16:00</span>
+                  <span>Сейчас</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

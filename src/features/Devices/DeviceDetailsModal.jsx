@@ -1,10 +1,48 @@
-import { FaTimes, FaCalendarAlt, FaTag, FaMapMarkerAlt, FaInfoCircle } from 'react-icons/fa'
+import { useState, useEffect } from 'react'
+import { FaTimes, FaCalendarAlt, FaTag, FaMapMarkerAlt, FaInfoCircle, FaUser } from 'react-icons/fa'
 import Modal from '../../components/common/Modal'
 import { Link } from 'react-router-dom'
 import { FiMap } from 'react-icons/fi'
 import Button from '../../components/ui/Button'
+import { getUserById } from '../../api/users'
 
 export default function DeviceDetailsModal({ isOpen, onClose, device }) {
+  const [creator, setCreator] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch creator information when device changes
+  useEffect(() => {
+    // Reset state when device changes
+    setCreator(null);
+    
+    let isMounted = true;
+    
+    async function fetchCreator() {
+      if (!device || !device.created_by) return;
+      
+      setLoading(true);
+      try {
+        const userData = await getUserById(device.created_by);
+        if (isMounted) {
+          setCreator(userData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+    
+    fetchCreator();
+    
+    // Cleanup function to prevent state updates if component unmounts
+    return () => {
+      isMounted = false;
+    };
+  }, [device?.id]); // Only depend on device.id, not the entire device object
+
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'Not set';
@@ -117,6 +155,28 @@ export default function DeviceDetailsModal({ isOpen, onClose, device }) {
               </div>
             ) : (
               <p className="text-gray-500 italic">No location information</p>
+            )}
+          </div>
+
+          {/* Creator info */}
+          <div className="bg-gray-750 p-4 rounded-lg">
+            <h5 className="text-md font-semibold text-gray-300 mb-3 flex items-center">
+              <FaUser className="mr-2 text-blue-400" /> Created By
+            </h5>
+            {loading ? (
+              <p className="text-gray-500 italic">Loading...</p>
+            ) : creator ? (
+              <div>
+                <p className="text-white"><span className="text-gray-400">User:</span> {creator.username}</p>
+                {creator.email && (
+                  <p className="text-white"><span className="text-gray-400">Email:</span> {creator.email}</p>
+                )}
+                <p className="text-white"><span className="text-gray-400">Role:</span> {creator.role}</p>
+              </div>
+            ) : device.created_by ? (
+              <p className="text-white"><span className="text-gray-400">User ID:</span> {device.created_by}</p>
+            ) : (
+              <p className="text-gray-500 italic">No creator information</p>
             )}
           </div>
 

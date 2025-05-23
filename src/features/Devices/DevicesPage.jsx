@@ -6,6 +6,7 @@ import { FiMap } from 'react-icons/fi'
 import { usePermissions } from '../../hooks/usePermissions'
 import { getAllDevices, deleteDevice } from '../../api/devices'
 import { getAllDeviceTypes } from '../../api/deviceTypes'
+import { getUserById } from '../../api/users'
 import { useLocations } from '../../hooks/useLocations'
 import AddDeviceModal from './AddDeviceModal'
 import EditDeviceModal from './EditDeviceModal'
@@ -27,6 +28,7 @@ export default function DevicesPage() {
     status: '',
     current_location_id: ''
   })
+  const [creators, setCreators] = useState({}) // Map of user_id -> user data
   const { isAdmin: _isAdmin } = usePermissions()
   const { locations } = useLocations()
 
@@ -42,6 +44,42 @@ export default function DevicesPage() {
       
       const data = await getAllDevices(filterParams)
       setDevices(data)
+
+      // Get unique creator IDs to fetch user data
+      const creatorIds = [...new Set(data.map(device => device.created_by).filter(Boolean))]
+      
+      // Only fetch creators that we don't already have
+      const newCreatorIds = creatorIds.filter(id => !creators[id])
+      
+      if (newCreatorIds.length > 0) {
+        // Fetch creator information
+        const creatorPromises = newCreatorIds.map(async (id) => {
+          try {
+            const userData = await getUserById(id)
+            return { id, userData }
+          } catch (error) {
+            console.error(`Error fetching user ${id}:`, error)
+            return { id, userData: null }
+          }
+        })
+
+        const creatorResults = await Promise.allSettled(creatorPromises)
+        const newCreatorsData = {}
+        
+        creatorResults.forEach(result => {
+          if (result.status === 'fulfilled' && result.value) {
+            const { id, userData } = result.value
+            if (userData) {
+              newCreatorsData[id] = userData
+            }
+          }
+        })
+
+        // Only update if we have new data
+        if (Object.keys(newCreatorsData).length > 0) {
+          setCreators(prev => ({...prev, ...newCreatorsData}))
+        }
+      }
     } catch (error) {
       console.error('Error fetching devices:', error)
       toast.error('Failed to load devices')
@@ -50,12 +88,8 @@ export default function DevicesPage() {
     }
   }, [filters])
 
-  useEffect(() => {
-    fetchDevices()
-    fetchDeviceTypes()
-  }, [fetchDevices])
-
-  const fetchDeviceTypes = async () => {
+  // Separate function to fetch device types to avoid constant refetching
+  const fetchDeviceTypes = useCallback(async () => {
     try {
       const data = await getAllDeviceTypes()
       setDeviceTypes(data)
@@ -63,7 +97,16 @@ export default function DevicesPage() {
       console.error('Error fetching device types:', error)
       toast.error('Failed to load device types')
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchDevices()
+  }, [fetchDevices])
+
+  // Fetch device types only once on initial load
+  useEffect(() => {
+    fetchDeviceTypes()
+  }, [fetchDeviceTypes])
 
   const handleFilterChange = (key, value) => {
     // If it's a location filter, we need special handling
