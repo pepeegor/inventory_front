@@ -59,7 +59,7 @@ export default function AnalyticsPage() {
             <FaDownload />
             {downloading ? 'Скачивание...' : 'Выгрузить XLSX'}
           </button>
-        </div>
+      </div>
 
         {(loadingSummary || loadingForecast) ? <Loader /> : (
           <>
@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
                       <li key={man} className="flex justify-between items-center">
                         <span className="text-gray-200">{man}</span>
                         <span className="font-bold text-violet-300">{count}</span>
-                      </li>
+                </li>
                     ))
                   ) : <li className="text-gray-400">Нет данных</li>}
                 </ul>
@@ -122,12 +122,12 @@ export default function AnalyticsPage() {
                       <li key={type} className="flex justify-between items-center">
                         <span className="text-gray-200">{type}</span>
                         <span className="font-bold text-amber-300">{count}</span>
-                      </li>
+                </li>
                     ))
                   ) : <li className="text-gray-400">Нет данных</li>}
-                </ul>
+              </ul>
               </div>
-            </div>
+          </div>
 
             {/* Прочие метрики */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -139,9 +139,9 @@ export default function AnalyticsPage() {
                 <div className="text-lg font-semibold mb-2 text-emerald-300">Всего отказов</div>
                 <div className="text-3xl font-bold text-white">{summary?.total_failures ?? '—'}</div>
               </div>
-            </div>
-          </>
-        )}
+          </div>
+        </>
+      )}
       </div>
     </AnimatedSection>
   )

@@ -7,6 +7,7 @@ import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useDataCenterActivity } from '../../hooks/useDataCenterActivity'
 import { FaTools } from 'react-icons/fa'
+import { getSummaryStats } from '../../api/stats'
 
 // Group navigation items by category
 const navSections = [
@@ -62,6 +63,24 @@ export default function Sidebar() {
   const location = useLocation()
   const { isAdmin } = usePermissions()
   const { values, timestamps, serverStatus, loading } = useDataCenterActivity();
+  
+  // --- Добавлено: загрузка краткой статистики ---
+  const [stats, setStats] = useState(null)
+  const [loadingStats, setLoadingStats] = useState(true)
+  const [statsError, setStatsError] = useState(false)
+  useEffect(() => {
+    let mounted = true
+    const fetchStats = () => {
+      setLoadingStats(true)
+      getSummaryStats()
+        .then(data => { if (mounted) { setStats(data); setStatsError(false); } })
+        .catch(() => { if (mounted) { setStatsError(true); } })
+        .finally(() => { if (mounted) setLoadingStats(false) })
+    }
+    fetchStats()
+    const intervalId = setInterval(fetchStats, 60000)
+    return () => { mounted = false; clearInterval(intervalId) }
+  }, [])
   
   // Auto expand sections on load based on active route
   useEffect(() => {
@@ -139,15 +158,21 @@ export default function Sidebar() {
               <div className="grid grid-cols-3 gap-1 my-2">
                 <div className="px-2 py-1.5 rounded-lg bg-[#2d2d36]/40">
                   <div className="text-xs text-violet-400">Устройств</div>
-                  <div className="text-lg font-semibold">127</div>
+                  <div className="text-lg font-semibold">
+                    {loadingStats ? <span className="animate-pulse">...</span> : (statsError ? '—' : stats?.total_devices ?? '—')}
+                  </div>
                 </div>
                 <div className="px-2 py-1.5 rounded-lg bg-[#2d2d36]/40">
                   <div className="text-xs text-violet-400">Неполадки</div>
-                  <div className="text-lg font-semibold">3</div>
+                  <div className="text-lg font-semibold">
+                    {loadingStats ? <span className="animate-pulse">...</span> : (statsError ? '—' : stats?.total_failures ?? '—')}
+                  </div>
                 </div>
                 <div className="px-2 py-1.5 rounded-lg bg-[#2d2d36]/40">
                   <div className="text-xs text-violet-400">Списано</div>
-                  <div className="text-lg font-semibold">12</div>
+                  <div className="text-lg font-semibold">
+                    {loadingStats ? <span className="animate-pulse">...</span> : (statsError ? '—' : stats?.total_writeoffs ?? '—')}
+                  </div>
                 </div>
               </div>
               

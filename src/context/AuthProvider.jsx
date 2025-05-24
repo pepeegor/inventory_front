@@ -20,9 +20,9 @@ export default function AuthProvider({ children }) {
       setUser(null)
       
       // Redirect to login if not on login or register page
-      const publicPaths = ['/login', '/register']
+      const publicPaths = ['/login', '/register', '/home', '/']
       if (!publicPaths.includes(location.pathname)) {
-        navigate('/login', { replace: true })
+        navigate('/home', { replace: true })
       }
     } finally {
       setLoading(false)

@@ -28,4 +28,10 @@ export const fetchMaintenanceEfficiency = (months = 12) =>
   axiosClient.get('/stats/maintenance-efficiency', { params: { months } }).then(res => res.data);
 
 export const fetchFailureAnalysis = () =>
-  axiosClient.get('/stats/failure-analysis').then(res => res.data); 
+  axiosClient.get('/stats/failure-analysis').then(res => res.data);
+
+// Получить краткую статистику по устройствам, неполадкам и списаниям
+export const getSummaryStats = async () => {
+  const response = await axiosClient.get('/stats/summary');
+  return response.data;
+}; 
