@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@headlessui/react'
 import { motion as Motion } from 'framer-motion'
-import { FiX, FiBox, FiAlertCircle, FiMessageSquare } from 'react-icons/fi'
+import { FiX, FiAlertCircle, FiMessageSquare } from 'react-icons/fi'
 import { toast } from 'react-toastify'
-import { createInventoryItem } from '../../api/inventoryEvents'
-import { getAllDevices } from '../../api/devices'
+import { updateInventoryItem } from '../../api/inventoryEvents'
 
 const DEVICE_CONDITIONS = {
   ok: { label: 'Исправно', color: 'emerald' },
@@ -13,38 +12,30 @@ const DEVICE_CONDITIONS = {
   broken: { label: 'Неисправно', color: 'red' }
 }
 
-export default function AddInventoryItemModal({ isOpen, onClose, eventId, event }) {
+export default function EditInventoryItemModal({ isOpen, onClose, item, devices }) {
   const [formData, setFormData] = useState({
-    device_id: '',
-    found: true,
-    condition: 'ok',
-    comments: ''
+    found: item.found,
+    condition: item.condition,
+    comments: item.comments || ''
   })
 
   const queryClient = useQueryClient()
 
-  // Fetch devices for the specific location
-  const { data: devices = [] } = useQuery({
-    queryKey: ['devices', { location_id: event.location.id }],
-    queryFn: () => getAllDevices({ current_location_id: event.location.id }),
-    enabled: !!event.location.id
-  })
-
-  const createMutation = useMutation({
-    mutationFn: (data) => createInventoryItem(eventId, data),
+  const updateMutation = useMutation({
+    mutationFn: (data) => updateInventoryItem(item.id, data),
     onSuccess: () => {
-      toast.success('Устройство успешно добавлено')
-      queryClient.invalidateQueries(['inventory-event', eventId])
+      toast.success('Запись успешно обновлена')
+      queryClient.invalidateQueries(['inventory-event'])
       onClose()
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || 'Ошибка при добавлении устройства')
+      toast.error(error.response?.data?.detail || 'Ошибка при обновлении записи')
     }
   })
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    createMutation.mutate(formData)
+    updateMutation.mutate(formData)
   }
 
   const handleChange = (e) => {
@@ -54,6 +45,8 @@ export default function AddInventoryItemModal({ isOpen, onClose, eventId, event 
       [name]: type === 'checkbox' ? checked : value
     }))
   }
+
+  const device = devices.find(d => d.id === item.device_id)
 
   return (
     <Dialog
@@ -74,10 +67,10 @@ export default function AddInventoryItemModal({ isOpen, onClose, eventId, event 
           <div className="p-4 border-b border-violet-500/20 bg-gradient-to-r from-violet-900/30 via-violet-800/20 to-violet-900/30 flex justify-between items-center">
             <div>
               <h3 className="text-lg font-medium text-white">
-                Добавить устройство
+                Редактировать запись
               </h3>
               <p className="text-sm text-gray-400">
-                Локация: {event.location.name}
+                Устройство: {device?.name || device?.serial_number}
               </p>
             </div>
             <button
@@ -91,29 +84,6 @@ export default function AddInventoryItemModal({ isOpen, onClose, eventId, event 
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300">
-                  Устройство
-                </label>
-                <div className="relative">
-                  <select
-                    name="device_id"
-                    value={formData.device_id}
-                    onChange={handleChange}
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-colors"
-                  >
-                    <option value="">Выберите устройство</option>
-                    {devices.map(device => (
-                      <option key={device.id} value={device.id}>
-                        {device.name || device.serial_number}
-                      </option>
-                    ))}
-                  </select>
-                  <FiBox className="absolute left-3 top-1/2 transform -translate-y-1/2 text-violet-400" />
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
                   <input
@@ -180,10 +150,10 @@ export default function AddInventoryItemModal({ isOpen, onClose, eventId, event 
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={createMutation.isLoading}
+              disabled={updateMutation.isLoading}
               className="px-4 py-2 bg-violet-600/20 hover:bg-violet-600/40 text-violet-300 rounded-lg transition-colors border border-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {createMutation.isLoading ? 'Добавление...' : 'Добавить'}
+              {updateMutation.isLoading ? 'Сохранение...' : 'Сохранить'}
             </button>
           </div>
         </Motion.div>

@@ -15,9 +15,9 @@ export default function ProtectedRoute() {
     )
   }
 
-  // If not authenticated, redirect to login
+  // If not authenticated, redirect to HomePage
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/home" state={{ from: location }} replace />
   }
 
   // If authenticated, show the outlet (child routes)

@@ -1,234 +1,121 @@
-import { useState, useEffect } from 'react'
-import { FaTimes, FaCalendarAlt, FaTag, FaMapMarkerAlt, FaInfoCircle, FaUser } from 'react-icons/fa'
-import Modal from '../../components/common/Modal'
-import { Link } from 'react-router-dom'
-import { FiMap } from 'react-icons/fi'
-import Button from '../../components/ui/Button'
-import { getUserById } from '../../api/users'
+import { Dialog } from '@headlessui/react'
+import { FaTimes } from 'react-icons/fa'
+import { motion as Motion } from 'framer-motion'
 
-export default function DeviceDetailsModal({ isOpen, onClose, device }) {
-  const [creator, setCreator] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  // Fetch creator information when device changes
-  useEffect(() => {
-    // Reset state when device changes
-    setCreator(null);
-    
-    let isMounted = true;
-    
-    async function fetchCreator() {
-      if (!device || !device.created_by) return;
-      
-      setLoading(true);
-      try {
-        const userData = await getUserById(device.created_by);
-        if (isMounted) {
-          setCreator(userData);
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-    
-    fetchCreator();
-    
-    // Cleanup function to prevent state updates if component unmounts
-    return () => {
-      isMounted = false;
-    };
-  }, [device?.id]); // Only depend on device.id, not the entire device object
-
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Not set';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  // Get status badge class based on status
-  const getStatusBadgeClass = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'maintenance':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'storage':
-        return 'bg-blue-100 text-blue-800';
-      case 'repair':
-        return 'bg-orange-100 text-orange-800';
-      case 'decommissioned':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const calculateWarrantyStatus = () => {
-    if (!device.warranty_end) return { status: 'Not set', className: 'text-gray-400' };
-    
-    const endDate = new Date(device.warranty_end);
-    const now = new Date();
-    
-    if (endDate < now) {
-      return { 
-        status: 'Expired', 
-        className: 'text-red-500',
-        daysAgo: Math.floor((now - endDate) / (1000 * 60 * 60 * 24))
-      };
-    }
-    
-    const daysRemaining = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
-    
-    if (daysRemaining <= 30) {
-      return { 
-        status: 'Expiring soon', 
-        className: 'text-orange-500',
-        daysRemaining
-      };
-    }
-    
-    return { 
-      status: 'Valid', 
-      className: 'text-green-500',
-      daysRemaining 
-    };
-  };
-
-  const warrantyDetails = calculateWarrantyStatus();
+export default function DeviceDetailsModal({ isOpen, onClose, device, deviceTypes, locations }) {
+  const deviceType = deviceTypes.find(t => t.id === device.type_id)
+  const location = locations.find(l => l.id === device.current_location_id)
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-t-lg flex justify-between items-center border-b border-gray-700">
-        <h3 className="text-xl font-medium text-white">Device Details</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-white">
-          <FaTimes />
-        </button>
-      </div>
-      
-      <div className="bg-gray-800 p-4">
-        {/* Device header */}
-        <div className="mb-6 text-center">
-          <h4 className="text-2xl font-semibold text-white mb-2">{device.serial_number}</h4>
-          <span className={`${getStatusBadgeClass(device.status)} px-3 py-1 rounded-full text-sm font-medium`}>
-            {device.status?.charAt(0).toUpperCase() + device.status?.slice(1) || 'Unknown'}
-          </span>
-        </div>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      className="relative z-50"
+    >
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
 
-        {/* Device info grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Type info */}
-          <div className="bg-gray-750 p-4 rounded-lg">
-            <h5 className="text-md font-semibold text-gray-300 mb-3 flex items-center">
-              <FaTag className="mr-2 text-blue-400" /> Device Type
-            </h5>
-            {device.type ? (
-              <div>
-                <p className="text-white"><span className="text-gray-400">Manufacturer:</span> {device.type.manufacturer}</p>
-                <p className="text-white"><span className="text-gray-400">Model:</span> {device.type.model}</p>
-                <p className="text-white"><span className="text-gray-400">Part Type:</span> {device.type.part_types?.name}</p>
-                <p className="text-white">
-                  <span className="text-gray-400">Expected Lifetime:</span> {device.type.expected_lifetime_months ? `${device.type.expected_lifetime_months} months` : 'Not set'}
-                </p>
-              </div>
-            ) : (
-              <p className="text-gray-500 italic">No type information</p>
-            )}
-          </div>
-
-          {/* Location info */}
-          <div className="bg-gray-750 p-4 rounded-lg">
-            <h5 className="text-md font-semibold text-gray-300 mb-3 flex items-center">
-              <FaMapMarkerAlt className="mr-2 text-blue-400" /> Location
-            </h5>
-            {device.current_location ? (
-              <div>
-                <p className="text-white"><span className="text-gray-400">Location:</span> {device.current_location.name}</p>
-              </div>
-            ) : (
-              <p className="text-gray-500 italic">No location information</p>
-            )}
-          </div>
-
-          {/* Creator info */}
-          <div className="bg-gray-750 p-4 rounded-lg">
-            <h5 className="text-md font-semibold text-gray-300 mb-3 flex items-center">
-              <FaUser className="mr-2 text-blue-400" /> Created By
-            </h5>
-            {loading ? (
-              <p className="text-gray-500 italic">Loading...</p>
-            ) : creator ? (
-              <div>
-                <p className="text-white"><span className="text-gray-400">User:</span> {creator.username}</p>
-                {creator.email && (
-                  <p className="text-white"><span className="text-gray-400">Email:</span> {creator.email}</p>
-                )}
-                <p className="text-white"><span className="text-gray-400">Role:</span> {creator.role}</p>
-              </div>
-            ) : device.created_by ? (
-              <p className="text-white"><span className="text-gray-400">User ID:</span> {device.created_by}</p>
-            ) : (
-              <p className="text-gray-500 italic">No creator information</p>
-            )}
-          </div>
-
-          {/* Warranty info */}
-          <div className="bg-gray-750 p-4 rounded-lg">
-            <h5 className="text-md font-semibold text-gray-300 mb-3 flex items-center">
-              <FaCalendarAlt className="mr-2 text-blue-400" /> Warranty
-            </h5>
-            {warrantyDetails.status === 'Not set' ? (
-              <p className="text-gray-500 italic">No warranty information</p>
-            ) : (
-              <div>
-                <p className={`text-${warrantyDetails.className} text-sm`}>
-                  {warrantyDetails.status}
-                </p>
-                {warrantyDetails.status === 'Expiring soon' && (
-                  <p className="text-gray-500 text-sm">
-                    {warrantyDetails.daysRemaining} days remaining
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Purchase date info */}
-          <div className="bg-gray-750 p-4 rounded-lg">
-            <h5 className="text-md font-semibold text-gray-300 mb-3 flex items-center">
-              <FaCalendarAlt className="mr-2 text-blue-400" /> Purchase Date
-            </h5>
-            {device.purchase_date ? (
-              <p className="text-white">
-                {formatDate(device.purchase_date)}
-              </p>
-            ) : (
-              <p className="text-gray-500 italic">No purchase date information</p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-between mt-4">
-          <div>
-            <Button 
-              as={Link} 
-              to={`/devices/${device.id}/movements`}
-              className="flex items-center gap-2 bg-indigo-600"
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className="bg-[#1f1f25] border border-violet-500/20 rounded-xl shadow-lg w-full max-w-2xl overflow-hidden"
+        >
+          {/* Header */}
+          <div className="p-4 border-b border-violet-500/20 bg-gradient-to-r from-violet-900/30 via-violet-800/20 to-violet-900/30 flex justify-between items-center">
+            <h3 className="text-lg font-medium text-white">
+              Детали устройства
+            </h3>
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
             >
-              <FiMap /> История перемещений
-            </Button>
+              <FaTimes />
+            </button>
           </div>
-          <Button onClick={onClose}>Закрыть</Button>
-        </div>
+
+          {/* Content */}
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">ID</label>
+                  <div className="text-white">{device.id}</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Серийный номер</label>
+                  <div className="text-white">{device.serial_number}</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Название</label>
+                  <div className="text-white">{device.name || '-'}</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Тип устройства</label>
+                  <div className="text-white">
+                    {deviceType ? (
+                      <div className="flex flex-col">
+                        <span>{deviceType.manufacturer} {deviceType.model}</span>
+                        {deviceType.part_types?.name && (
+                          <span className="text-sm text-violet-400">{deviceType.part_types.name}</span>
+                        )}
+                      </div>
+                    ) : '-'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Текущая локация</label>
+                  <div className="text-white">{location?.name || '-'}</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Статус</label>
+                  <div className="text-white capitalize">{device.status || '-'}</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Дата покупки</label>
+                  <div className="text-white">
+                    {device.purchase_date ? new Date(device.purchase_date).toLocaleDateString() : '-'}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Гарантия до</label>
+                  <div className="text-white">
+                    {device.warranty_end ? new Date(device.warranty_end).toLocaleDateString() : '-'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {device.notes && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-400">Заметки</label>
+                <div className="text-white whitespace-pre-wrap p-4 bg-black/20 rounded-lg border border-violet-500/10">
+                  {device.notes}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 border-t border-violet-500/20 bg-black/20 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-violet-600/20 hover:bg-violet-600/40 text-violet-300 rounded-lg transition-colors border border-violet-500/20"
+            >
+              Закрыть
+            </button>
+          </div>
+        </Motion.div>
       </div>
-    </Modal>
+    </Dialog>
   )
 } 

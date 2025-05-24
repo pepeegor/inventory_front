@@ -1,14 +1,17 @@
-import axios from './axios'
+import axiosClient from './axiosClient'
 
-export function getFailureStats(partTypeId, filters = {}) {
-  return axios
-    .get(`/analytics/part-types/${partTypeId}/failure-stats`, { params: filters })
-    .then(res => res.data)
+export const fetchForecastReplacement = async () => {
+  const { data } = await axiosClient.get('/analytics/forecast')
+  return data
 }
 
+export const fetchSummary = async () => {
+  const { data } = await axiosClient.get('/analytics/summary')
+  return data
+}
 
-export function getForecastReplacement(partTypeId) {
-  return axios
-    .get(`/analytics/part-types/${partTypeId}/forecast-replacement`)
-    .then(res => res.data)
+export const fetchSummaryXlsx = async () => {
+  // Получаем файл как blob
+  const response = await axiosClient.get('/analytics/summary-xlsx', { responseType: 'blob' })
+  return response.data
 }

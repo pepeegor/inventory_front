@@ -1,44 +1,30 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@headlessui/react'
 import { motion as Motion } from 'framer-motion'
-import { FiX, FiBox, FiAlertCircle, FiMessageSquare } from 'react-icons/fi'
+import { FiX, FiCalendar, FiMapPin, FiMessageSquare } from 'react-icons/fi'
 import { toast } from 'react-toastify'
-import { createInventoryItem } from '../../api/inventoryEvents'
-import { getAllDevices } from '../../api/devices'
+import { createInventoryEvent } from '../../api/inventoryEvents'
+import { flattenLocationTree } from '../../utils/locationUtils'
 
-const DEVICE_CONDITIONS = {
-  ok: { label: 'Исправно', color: 'emerald' },
-  needs_maintenance: { label: 'Требует обслуживания', color: 'amber' },
-  broken: { label: 'Неисправно', color: 'red' }
-}
-
-export default function AddInventoryItemModal({ isOpen, onClose, eventId, event }) {
+export default function CreateInventoryModal({ isOpen, onClose, locations }) {
   const [formData, setFormData] = useState({
-    device_id: '',
-    found: true,
-    condition: 'ok',
-    comments: ''
+    event_date: new Date().toISOString().split('T')[0],
+    location_id: '',
+    notes: ''
   })
 
   const queryClient = useQueryClient()
 
-  // Fetch devices for the specific location
-  const { data: devices = [] } = useQuery({
-    queryKey: ['devices', { location_id: event.location.id }],
-    queryFn: () => getAllDevices({ current_location_id: event.location.id }),
-    enabled: !!event.location.id
-  })
-
   const createMutation = useMutation({
-    mutationFn: (data) => createInventoryItem(eventId, data),
+    mutationFn: (data) => createInventoryEvent(data),
     onSuccess: () => {
-      toast.success('Устройство успешно добавлено')
-      queryClient.invalidateQueries(['inventory-event', eventId])
+      toast.success('Инвентаризация успешно создана')
+      queryClient.invalidateQueries(['inventory-events'])
       onClose()
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || 'Ошибка при добавлении устройства')
+      toast.error(error.response?.data?.detail || 'Ошибка при создании инвентаризации')
     }
   })
 
@@ -48,11 +34,8 @@ export default function AddInventoryItemModal({ isOpen, onClose, eventId, event 
   }
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }))
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
   return (
@@ -72,14 +55,9 @@ export default function AddInventoryItemModal({ isOpen, onClose, eventId, event 
         >
           {/* Header */}
           <div className="p-4 border-b border-violet-500/20 bg-gradient-to-r from-violet-900/30 via-violet-800/20 to-violet-900/30 flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-medium text-white">
-                Добавить устройство
-              </h3>
-              <p className="text-sm text-gray-400">
-                Локация: {event.location.name}
-              </p>
-            </div>
+            <h3 className="text-lg font-medium text-white">
+              Новая инвентаризация
+            </h3>
             <button
               onClick={onClose}
               className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
@@ -93,70 +71,52 @@ export default function AddInventoryItemModal({ isOpen, onClose, eventId, event 
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-300">
-                  Устройство
+                  Дата инвентаризации
                 </label>
                 <div className="relative">
-                  <select
-                    name="device_id"
-                    value={formData.device_id}
-                    onChange={handleChange}
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-colors"
-                  >
-                    <option value="">Выберите устройство</option>
-                    {devices.map(device => (
-                      <option key={device.id} value={device.id}>
-                        {device.name || device.serial_number}
-                      </option>
-                    ))}
-                  </select>
-                  <FiBox className="absolute left-3 top-1/2 transform -translate-y-1/2 text-violet-400" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
                   <input
-                    type="checkbox"
-                    name="found"
-                    checked={formData.found}
-                    onChange={handleChange}
-                    className="w-4 h-4 rounded border-violet-500/20 text-violet-500 focus:ring-violet-500/50 focus:ring-offset-0 bg-[#1f1f25]/90"
-                  />
-                  Устройство найдено
-                </label>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300">
-                  Состояние
-                </label>
-                <div className="relative">
-                  <select
-                    name="condition"
-                    value={formData.condition}
+                    type="date"
+                    name="event_date"
+                    value={formData.event_date}
                     onChange={handleChange}
                     required
                     className="w-full pl-10 pr-4 py-2.5 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-colors"
-                  >
-                    {Object.entries(DEVICE_CONDITIONS).map(([value, { label }]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                  <FiAlertCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-violet-400" />
+                  />
+                  <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-violet-400" />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-300">
-                  Комментарий
+                  Локация
+                </label>
+                <div className="relative">
+                  <select
+                    name="location_id"
+                    value={formData.location_id}
+                    onChange={handleChange}
+                    required
+                    className="w-full pl-10 pr-4 py-2.5 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-colors"
+                  >
+                    <option value="">Выберите локацию</option>
+                    {flattenLocationTree(locations).map(location => (
+                      <option key={location.id} value={location.id}>
+                        {location.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <FiMapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-violet-400" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-300">
+                  Заметки
                 </label>
                 <div className="relative">
                   <textarea
-                    name="comments"
-                    value={formData.comments}
+                    name="notes"
+                    value={formData.notes}
                     onChange={handleChange}
                     rows={4}
                     placeholder="Дополнительные заметки..."
@@ -183,7 +143,7 @@ export default function AddInventoryItemModal({ isOpen, onClose, eventId, event 
               disabled={createMutation.isLoading}
               className="px-4 py-2 bg-violet-600/20 hover:bg-violet-600/40 text-violet-300 rounded-lg transition-colors border border-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {createMutation.isLoading ? 'Добавление...' : 'Добавить'}
+              {createMutation.isLoading ? 'Создание...' : 'Создать'}
             </button>
           </div>
         </Motion.div>

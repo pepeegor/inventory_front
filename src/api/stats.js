@@ -16,4 +16,16 @@ export const getDataCenterActivity = async () => {
       values: Array(24).fill(0).map(() => Math.floor(20 + Math.random() * 60))
     };
   }
-}; 
+};
+
+export const fetchDeviceLifecycle = (months = 12) =>
+  axiosClient.get('/stats/device-lifecycle', { params: { months } }).then(res => res.data);
+
+export const fetchReliabilityMap = () =>
+  axiosClient.get('/stats/reliability-map').then(res => res.data);
+
+export const fetchMaintenanceEfficiency = (months = 12) =>
+  axiosClient.get('/stats/maintenance-efficiency', { params: { months } }).then(res => res.data);
+
+export const fetchFailureAnalysis = () =>
+  axiosClient.get('/stats/failure-analysis').then(res => res.data); 

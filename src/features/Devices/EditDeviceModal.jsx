@@ -1,160 +1,244 @@
+import { Dialog } from '@headlessui/react'
 import { useState, useEffect } from 'react'
-import { toast } from 'react-toastify'
 import { FaTimes } from 'react-icons/fa'
+import { motion as Motion } from 'framer-motion'
+import { toast } from 'react-toastify'
 import { updateDevice } from '../../api/devices'
-import Modal from '../../components/common/Modal'
+import { flattenLocationTree } from '../../utils/locationUtils'
 
-export default function EditDeviceModal({ isOpen, onClose, device, onSuccess, deviceTypes }) {
+export default function EditDeviceModal({ isOpen, onClose, device, onSuccess, deviceTypes, locations }) {
   const [formData, setFormData] = useState({
     serial_number: '',
-    device_type_id: '',
-    status: 'active',
+    name: '',
+    type_id: '',
+    current_location_id: '',
+    status: '',
+    purchase_date: '',
+    warranty_end: '',
     notes: ''
   })
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (device) {
-      console.log('Setting form data from device:', device);
-      console.log('Current device type ID:', device.type?.id);
-      
       setFormData({
         serial_number: device.serial_number || '',
-        device_type_id: device.type?.id ? String(device.type.id) : '',
-        status: device.status || 'active',
+        name: device.name || '',
+        type_id: device.type_id || '',
+        current_location_id: device.current_location_id || '',
+        status: device.status || '',
+        purchase_date: device.purchase_date || '',
+        warranty_end: device.warranty_end || '',
         notes: device.notes || ''
-      });
-      
-      console.log('Device types available:', deviceTypes);
+      })
     }
-  }, [device, deviceTypes])
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
+  }, [device])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    
-    // Parse the device_type_id to ensure it's a number
-    const submissionData = {
-      ...formData,
-      device_type_id: formData.device_type_id ? Number(formData.device_type_id) : null
-    };
-    
-    console.log('Submitting device update:', submissionData);
-    
+
     try {
-      await updateDevice(device.id, submissionData)
-      toast.success('Device updated successfully')
+      await updateDevice(device.id, formData)
+      toast.success('Устройство успешно обновлено')
       onSuccess()
       onClose()
     } catch (error) {
       console.error('Error updating device:', error)
-      toast.error(error.response?.data?.detail || 'Failed to update device')
+      toast.error(error.response?.data?.detail || 'Ошибка при обновлении устройства')
     } finally {
       setLoading(false)
     }
   }
 
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Edit Device">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Serial Number
-          </label>
-          <input
-            type="text"
-            name="serial_number"
-            value={formData.serial_number}
-            onChange={handleChange}
-            className="bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 w-full"
-            required
-          />
-        </div>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      className="relative z-50"
+    >
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Device Type
-          </label>
-          <select
-            name="device_type_id"
-            value={formData.device_type_id}
-            onChange={handleChange}
-            className="bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 w-full"
-            required
-          >
-            <option value="">Select Device Type</option>
-            {deviceTypes && deviceTypes.map(type => {
-              const isSelected = type.id === Number(formData.device_type_id);
-              return (
-                <option 
-                  key={type.id} 
-                  value={type.id}
-                  className={isSelected ? "bg-blue-900" : ""}
-                >
-                  {type.manufacturer} {type.model}
-                  {isSelected ? ' (Current)' : ''}
-                </option>
-              );
-            })}
-          </select>
-        </div>
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className="bg-[#1f1f25] border border-violet-500/20 rounded-xl shadow-lg w-full max-w-2xl overflow-hidden"
+        >
+          <form onSubmit={handleSubmit}>
+            {/* Header */}
+            <div className="p-4 border-b border-violet-500/20 bg-gradient-to-r from-violet-900/30 via-violet-800/20 to-violet-900/30 flex justify-between items-center">
+              <h3 className="text-lg font-medium text-white">
+                Редактировать устройство
+              </h3>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
+              >
+                <FaTimes />
+              </button>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Status
-          </label>
-          <select
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            className="bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 w-full"
-            required
-          >
-            <option value="active">Active</option>
-            <option value="storage">Storage</option>
-            <option value="maintenance">Maintenance</option>
-            <option value="decommissioned">Decommissioned</option>
-          </select>
-        </div>
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                      Серийный номер *
+                    </label>
+                    <input
+                      type="text"
+                      name="serial_number"
+                      value={formData.serial_number}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-2 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+                    />
+                  </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Notes
-          </label>
-          <textarea
-            name="notes"
-            value={formData.notes}
-            onChange={handleChange}
-            className="bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 w-full"
-            rows="3"
-          />
-        </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                      Название
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+                    />
+                  </div>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-gray-300 hover:text-white"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
-      </form>
-    </Modal>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                      Тип устройства *
+                    </label>
+                    <select
+                      name="type_id"
+                      value={formData.type_id}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-2 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+                    >
+                      <option value="">Выберите тип</option>
+                      {deviceTypes.map(type => (
+                        <option key={type.id} value={type.id}>
+                          {type.manufacturer} {type.model}
+                          {type.part_types?.name ? ` (${type.part_types.name})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                      Локация *
+                    </label>
+                    <select
+                      name="current_location_id"
+                      value={formData.current_location_id}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-2 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+                    >
+                      <option value="">Выберите локацию</option>
+                      {flattenLocationTree(locations).map(location => (
+                        <option key={location.id} value={location.id}>
+                          {location.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                      Статус *
+                    </label>
+                    <select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-2 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+                    >
+                      <option value="storage">На складе</option>
+                      <option value="active">Активно</option>
+                      <option value="maintenance">В ремонте</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                      Дата покупки
+                    </label>
+                    <input
+                      type="date"
+                      name="purchase_date"
+                      value={formData.purchase_date}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                      Гарантия до
+                    </label>
+                    <input
+                      type="date"
+                      name="warranty_end"
+                      value={formData.warranty_end}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Заметки
+                </label>
+                <textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  rows={3}
+                  className="w-full px-4 py-2 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-violet-500/20 bg-black/20 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors border border-gray-700"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 bg-violet-600/20 hover:bg-violet-600/40 text-violet-300 rounded-lg transition-colors border border-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </form>
+        </Motion.div>
+      </div>
+    </Dialog>
   )
 } 

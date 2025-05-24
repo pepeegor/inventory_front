@@ -25,4 +25,19 @@ export const flattenLocationTree = (locations, result = [], depth = 0) => {
   }
   
   return result;
+};
+
+
+export const getTotalLocationsCount = (locations) => {
+  if (!locations || !Array.isArray(locations)) return 0;
+  
+  let count = locations.length;
+  
+  for (const location of locations) {
+    if (location.children && Array.isArray(location.children)) {
+      count += getTotalLocationsCount(location.children);
+    }
+  }
+  
+  return count;
 }; 

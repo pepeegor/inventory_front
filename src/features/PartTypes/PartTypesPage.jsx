@@ -1,73 +1,83 @@
-import { useState, useEffect } from 'react'
-import { toast } from 'react-toastify'
-import { FaPlus, FaEdit, FaTrash, FaCog } from 'react-icons/fa'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { FaTools, FaSearch, FaPlus, FaEdit, FaTrash, FaTimes } from 'react-icons/fa'
+import { motion as Motion } from 'framer-motion'
+import { Dialog } from '@headlessui/react'
+import AnimatedSection from '../../components/AnimatedSection'
+import Button from '../../components/ui/Button'
+import Loader from '../../components/ui/Loader'
 import { usePermissions } from '../../hooks/usePermissions'
+import { toast } from 'react-toastify'
 import { getAllPartTypes, deletePartType } from '../../api/partTypes'
 import AddPartTypeModal from './AddPartTypeModal'
 import EditPartTypeModal from './EditPartTypeModal'
-import ConfirmModal from '../../components/common/ConfirmModal'
 
 export default function PartTypesPage() {
-  const [partTypes, setPartTypes] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [selectedPartType, setSelectedPartType] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+
   const { isAdmin } = usePermissions()
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    fetchPartTypes()
-  }, [])
+  // Fetch part types
+  const { data: partTypes = [], isLoading } = useQuery({
+    queryKey: ['partTypes'],
+    queryFn: getAllPartTypes
+  })
 
-  const fetchPartTypes = async () => {
-    setLoading(true)
-    try {
-      const data = await getAllPartTypes()
-      setPartTypes(data)
-    } catch (error) {
-      console.error('Error fetching part types:', error)
-      toast.error('Failed to load part types')
-    } finally {
-      setLoading(false)
+  // Filter part types locally based on search term
+  const filteredPartTypes = partTypes.filter(type => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      type.name?.toLowerCase().includes(searchLower) ||
+      type.description?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: deletePartType,
+    onSuccess: () => {
+      toast.success('Тип детали успешно удален')
+      queryClient.invalidateQueries(['partTypes'])
+      handleCloseDeleteModal()
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || 'Ошибка при удалении типа детали')
     }
-  }
+  })
 
-  const handleOpenAddModal = () => setIsAddModalOpen(true)
-  const handleCloseAddModal = () => setIsAddModalOpen(false)
+  const handleOpenAddModal = () => setShowAddModal(true)
+  const handleCloseAddModal = () => setShowAddModal(false)
 
   const handleOpenEditModal = (partType) => {
     setSelectedPartType(partType)
-    setIsEditModalOpen(true)
+    setShowEditModal(true)
   }
-  
+
   const handleCloseEditModal = () => {
     setSelectedPartType(null)
-    setIsEditModalOpen(false)
+    setShowEditModal(false)
   }
 
   const handleOpenDeleteModal = (partType) => {
     setSelectedPartType(partType)
-    setIsDeleteModalOpen(true)
+    setShowDeleteModal(true)
   }
-  
+
   const handleCloseDeleteModal = () => {
     setSelectedPartType(null)
-    setIsDeleteModalOpen(false)
+    setShowDeleteModal(false)
   }
 
-  const handleDelete = async () => {
-    if (!selectedPartType) return
-
-    try {
-      await deletePartType(selectedPartType.id)
-      toast.success('Part type deleted successfully')
-      fetchPartTypes()
-    } catch (error) {
-      console.error('Error deleting part type:', error)
-      toast.error(error.response?.data?.detail || 'Failed to delete part type')
-    } finally {
-      handleCloseDeleteModal()
+  const handleDelete = () => {
+    if (selectedPartType) {
+      deleteMutation.mutate(selectedPartType.id)
     }
   }
 
@@ -83,124 +93,197 @@ export default function PartTypesPage() {
   }
 
   return (
-    <div className="container mx-auto py-4 px-4 animate__animated animate__fadeIn">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-white flex items-center">
-          <FaCog className="mr-2" /> Part Types Management
-        </h2>
-        <button 
-          onClick={handleOpenAddModal}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-md transition duration-200 transform hover:scale-105"
-        >
-          <FaPlus /> Add New Part Type
-        </button>
-      </div>
+    <AnimatedSection className="p-6">
+      {/* Header Section */}
+      <Motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8"
+      >
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <h2 className="text-2xl font-bold text-white flex items-center">
+            <FaTools className="mr-2 text-violet-400" />
+            Типы деталей
+          </h2>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Поиск по типам деталей..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 bg-[#1f1f25]/90 border border-violet-500/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50"
+              />
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            </div>
+            
+            <Button
+              onClick={handleOpenAddModal}
+              className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+            >
+              <FaPlus /> Добавить тип детали
+            </Button>
+          </div>
+        </div>
+      </Motion.div>
 
-      <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
-        {loading ? (
+      {/* Main Content */}
+      <Motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="glassmorphism rounded-xl border border-violet-500/20 relative overflow-hidden"
+      >
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 grid grid-cols-10 grid-rows-10 opacity-5 pointer-events-none">
+          {Array.from({ length: 100 }).map((_, i) => (
+            <div key={i} className="border border-white/20"></div>
+          ))}
+        </div>
+
+        {isLoading ? (
           <div className="flex justify-center items-center py-10">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+            <Loader />
+          </div>
+        ) : filteredPartTypes.length === 0 ? (
+          <div className="text-center py-10 text-gray-400">
+            {searchTerm ? 'Типы деталей не найдены' : 'Нет типов деталей'}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-700">
-              <thead className="bg-gray-900">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">ID</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Description</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Expected Failure Interval</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Device Types</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+          <div className="relative z-10">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-violet-500/20">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Название
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Описание
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Интервал отказа (дней)
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-[120px]">
+                    Действия
+                  </th>
                 </tr>
               </thead>
-              <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {partTypes.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="px-6 py-4 text-center text-gray-400">No part types found</td>
-                  </tr>
-                ) : (
-                  partTypes.map((partType) => (
-                    <tr key={partType.id} className="hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{partType.id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{partType.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-300">
-                        {partType.description || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {partType.expected_failure_interval_days || 'Not set'} {partType.expected_failure_interval_days ? 'days' : ''}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {partType.device_types?.length ? (
-                          <div className="flex flex-wrap gap-1">
-                            {partType.device_types.map(dt => (
-                              <span 
-                                key={dt.id} 
-                                className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded"
-                              >
-                                {dt.manufacturer} {dt.model}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-gray-500">None</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => handleOpenEditModal(partType)}
-                            className="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-gray-600"
-                            title="Edit"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button 
-                            onClick={() => handleOpenDeleteModal(partType)}
-                            className={`text-red-400 hover:text-red-300 p-1 rounded hover:bg-gray-600 ${partType.device_types?.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title="Delete"
-                            disabled={partType.device_types?.length > 0}
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+              <tbody className="divide-y divide-violet-500/20">
+                {filteredPartTypes.map((partType) => (
+                  <Motion.tr
+                    key={partType.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}
+                    className="transition-colors"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-white">
+                      {partType.name}
+                    </td>
+                    <td className="px-6 py-4 text-gray-300">
+                      {partType.description || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-gray-300">
+                      {partType.expected_failure_interval_days || 'Н/Д'}
+                    </td>
+                    <td className="px-6 py-4 flex justify-end gap-2">
+                      <button
+                        onClick={() => handleOpenEditModal(partType)}
+                        className="p-2 bg-violet-600/20 hover:bg-violet-600/40 text-violet-300 rounded-lg transition-colors"
+                        title="Редактировать"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        onClick={() => handleOpenDeleteModal(partType)}
+                        className="p-2 bg-red-600/20 hover:bg-red-600/40 text-red-300 rounded-lg transition-colors"
+                        title="Удалить"
+                      >
+                        <FaTrash />
+                      </button>
+                    </td>
+                  </Motion.tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
-      </div>
+      </Motion.div>
 
-      {isAddModalOpen && (
-        <AddPartTypeModal 
-          isOpen={isAddModalOpen}
+      {/* Modals */}
+      {showAddModal && (
+        <AddPartTypeModal
+          isOpen={showAddModal}
           onClose={handleCloseAddModal}
-          onSuccess={fetchPartTypes}
         />
       )}
 
-      {isEditModalOpen && selectedPartType && (
+      {showEditModal && selectedPartType && (
         <EditPartTypeModal
-          isOpen={isEditModalOpen}
+          isOpen={showEditModal}
           onClose={handleCloseEditModal}
           partType={selectedPartType}
-          onSuccess={fetchPartTypes}
         />
       )}
 
-      {isDeleteModalOpen && selectedPartType && (
-        <ConfirmModal
-          isOpen={isDeleteModalOpen}
+      {showDeleteModal && selectedPartType && (
+        <Dialog
+          open={showDeleteModal}
           onClose={handleCloseDeleteModal}
-          title="Delete Part Type"
-          message={`Are you sure you want to delete the part type '${selectedPartType.name}'? This action cannot be undone.`}
-          onConfirm={handleDelete}
-          variant="danger"
-        />
+          className="relative z-50"
+        >
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
+
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <Motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#1f1f25] border border-violet-500/20 rounded-xl shadow-lg w-full max-w-lg overflow-hidden"
+            >
+              {/* Header */}
+              <div className="p-4 border-b border-violet-500/20 bg-gradient-to-r from-violet-900/30 via-violet-800/20 to-violet-900/30 flex justify-between items-center">
+                <h3 className="text-lg font-medium text-white">
+                  Удаление типа детали
+                </h3>
+                <button
+                  onClick={handleCloseDeleteModal}
+                  className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <p className="text-gray-300">
+                  Вы уверены, что хотите удалить тип детали <span className="text-white font-medium">'{selectedPartType.name}'</span>?
+                </p>
+                <p className="mt-2 text-red-400 text-sm">
+                  Это действие нельзя отменить.
+                </p>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-violet-500/20 bg-black/20 flex justify-end gap-3">
+                <button
+                  onClick={handleCloseDeleteModal}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors border border-gray-700"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-300 rounded-lg transition-colors border border-red-500/20"
+                >
+                  Удалить
+                </button>
+              </div>
+            </Motion.div>
+          </div>
+        </Dialog>
       )}
-    </div>
+    </AnimatedSection>
   )
 } 

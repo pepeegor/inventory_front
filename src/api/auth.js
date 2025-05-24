@@ -31,4 +31,19 @@ export function changeUserPassword({ old_password, new_password }) {
     old_password,
     new_password
   }).then(res => res.data)
+}
+
+export const getMe = async () => {
+  const { data } = await axiosClient.get('/auth/me')
+  return data
+}
+
+export const updateMe = async (payload) => {
+  const { data } = await axiosClient.put('/auth/me', payload)
+  return data
+}
+
+export const changePassword = async (payload) => {
+  // payload: { old_password, new_password }
+  await axiosClient.post('/auth/me/change-password', payload)
 } 
